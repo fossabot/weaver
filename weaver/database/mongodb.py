@@ -6,6 +6,7 @@ import warnings
 from typing import TYPE_CHECKING, overload
 
 import pymongo
+from pymongo.errors import OperationFailure
 
 from weaver.database.base import DatabaseInterface
 from weaver.store.mongodb import (
@@ -229,7 +230,13 @@ def get_mongodb_engine(container):
     db = get_mongodb_connection(container)
     db.services.create_index("name", unique=True)
     db.services.create_index("url", unique=True)
-    db.processes.create_index("identifier", unique=True)
+    try:
+        # migration of old db definition if executed on older instance
+        # from: 'db.processes.create_index("identifier", unique=True)'
+        db.processes.drop_index([("identifier", pymongo.ASCENDING)])
+    except OperationFailure:
+        pass
+    db.processes.create_index([("identifier", pymongo.ASCENDING), ("version", pymongo.ASCENDING)], unique=True)
     db.jobs.create_index("id", unique=True)
     db.quotes.create_index("id", unique=True)
     db.bills.create_index("id", unique=True)
